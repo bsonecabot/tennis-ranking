@@ -14,6 +14,10 @@ import {
   Menu,
   MenuItem,
   CircularProgress,
+  TextField,
+  Alert,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import {
   Home as HomeIcon,
@@ -31,8 +35,111 @@ const navItems = [
   { label: "History", icon: <HistoryIcon />, path: "/history" },
 ];
 
+function LoginForm() {
+  const { login, register } = useAuth();
+  const [tab, setTab] = useState(0);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (tab === 0) {
+        await login(email, password);
+      } else {
+        if (!displayName.trim()) {
+          setError("Name is required");
+          setLoading(false);
+          return;
+        }
+        await register(email, password, displayName);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      justifyContent="center"
+      minHeight="100vh"
+      gap={3}
+      p={3}
+    >
+      <TennisIcon sx={{ fontSize: 80, color: "primary.main" }} />
+      <Typography variant="h3" fontWeight="bold">
+        Tennis Ranking
+      </Typography>
+      <Typography variant="body1" color="text.secondary">
+        Track matches and ELO ratings among friends
+      </Typography>
+
+      <Paper sx={{ p: 3, width: "100%", maxWidth: 400 }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} centered sx={{ mb: 2 }}>
+          <Tab label="Login" />
+          <Tab label="Register" />
+        </Tabs>
+
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+        <Box component="form" onSubmit={handleSubmit} display="flex" flexDirection="column" gap={2}>
+          <TextField
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            fullWidth
+          />
+
+          {tab === 1 && (
+            <TextField
+              label="Name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+              fullWidth
+            />
+          )}
+
+          <TextField
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            fullWidth
+            inputProps={{ minLength: 6 }}
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            disabled={loading}
+            fullWidth
+          >
+            {loading ? <CircularProgress size={24} /> : (tab === 0 ? "Login" : "Register")}
+          </Button>
+        </Box>
+      </Paper>
+    </Box>
+  );
+}
+
 export default function Layout() {
-  const { player, loading, signInWithGoogle, logout } = useAuth();
+  const { player, loading, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -55,36 +162,7 @@ export default function Layout() {
   }
 
   if (!player) {
-    const handleSignIn = () => {
-      signInWithGoogle();
-    };
-
-    return (
-      <Box
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-        justifyContent="center"
-        minHeight="100vh"
-        gap={3}
-      >
-        <TennisIcon sx={{ fontSize: 80, color: "primary.main" }} />
-        <Typography variant="h3" fontWeight="bold">
-          Tennis Ranking
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Track matches and ELO ratings among friends
-        </Typography>
-        <Button
-          variant="contained"
-          size="large"
-          onClick={handleSignIn}
-          sx={{ mt: 2 }}
-        >
-          Sign in with Google
-        </Button>
-      </Box>
-    );
+    return <LoginForm />;
   }
 
   return (
@@ -100,7 +178,9 @@ export default function Layout() {
               src={player.photoURL || undefined}
               alt={player.displayName}
               sx={{ width: 32, height: 32 }}
-            />
+            >
+              {player.displayName[0]}
+            </Avatar>
           </IconButton>
           <Menu
             anchorEl={anchorEl}

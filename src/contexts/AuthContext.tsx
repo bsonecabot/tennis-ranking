@@ -6,15 +6,13 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
 import { api, type ApiPlayer } from "../api/client";
-
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
 interface AuthContextType {
   player: ApiPlayer | null;
   loading: boolean;
-  signInWithGoogle: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -24,7 +22,7 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-function AuthProviderInner({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [player, setPlayer] = useState<ApiPlayer | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,42 +44,17 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        // Get user info from Google
-        const userInfoResponse = await fetch(
-          "https://www.googleapis.com/oauth2/v3/userinfo",
-          {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-          }
-        );
-        const userInfo = await userInfoResponse.json();
+  const login = useCallback(async (email: string, password: string) => {
+    const { token, player } = await api.login({ email, password });
+    api.setToken(token);
+    setPlayer(player);
+  }, []);
 
-        // Send to our API
-        const { token, player } = await api.loginWithGoogle({
-          googleId: userInfo.sub,
-          email: userInfo.email,
-          displayName: userInfo.name,
-          photoURL: userInfo.picture,
-        });
-
-        api.setToken(token);
-        setPlayer(player);
-      } catch (error) {
-        console.error("Login error:", error);
-        alert("Login failed. Please try again.");
-      }
-    },
-    onError: (error) => {
-      console.error("Google login error:", error);
-      alert("Google login failed. Please try again.");
-    },
-  });
-
-  const signInWithGoogle = useCallback(() => {
-    googleLogin();
-  }, [googleLogin]);
+  const register = useCallback(async (email: string, password: string, displayName: string) => {
+    const { token, player } = await api.register({ email, password, displayName });
+    api.setToken(token);
+    setPlayer(player);
+  }, []);
 
   const logout = useCallback(() => {
     api.setToken(null);
@@ -89,16 +62,8 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ player, loading, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ player, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
-  );
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthProviderInner>{children}</AuthProviderInner>
-    </GoogleOAuthProvider>
   );
 }

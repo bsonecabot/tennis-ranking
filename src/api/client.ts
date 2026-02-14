@@ -48,6 +48,27 @@ class ApiClient {
   }
 
   // Auth
+  async register(data: {
+    email: string;
+    password: string;
+    displayName: string;
+  }): Promise<{ token: string; player: ApiPlayer }> {
+    return this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async login(data: {
+    email: string;
+    password: string;
+  }): Promise<{ token: string; player: ApiPlayer }> {
+    return this.request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async loginWithGoogle(googleData: {
     googleId: string;
     email: string;
