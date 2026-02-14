@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "tennis-ranking-b12a4"
-  }
+  },
+  "targets": {
+    "tennis-ranking-b12a4": {
+      "hosting": {
+        "dev": [
+          "tennis-ranking-b12a4"
+        ],
+        "prod": [
+          "tennis-ranking-prod"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
