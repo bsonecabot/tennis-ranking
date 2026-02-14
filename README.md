@@ -1,73 +1,91 @@
-# React + TypeScript + Vite
+# Tennis Ranking Frontend 🎾
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite + MUI frontend for the Tennis Ranking system.
 
-Currently, two official plugins are available:
+## Quick Start (with Docker)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+O jeito mais fácil é usar o docker-compose no backend:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd ../tennis-ranking-api
+docker-compose up
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Isso sobe PostgreSQL + API + Frontend automaticamente.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Desenvolvimento Local
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Configurar variáveis de ambiente
+
+```bash
+cp .env.example .env.local
 ```
+
+Edite `.env.local`:
+- `VITE_API_URL` - URL da API (default: http://localhost:3000)
+- `VITE_GOOGLE_CLIENT_ID` - Client ID do Google OAuth
+
+### 2. Instalar dependências
+
+```bash
+npm install
+```
+
+### 3. Rodar em dev mode
+
+```bash
+npm run dev
+```
+
+O app estará em http://localhost:5173
+
+## Scripts
+
+- `npm run dev` - Development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run test` - Run tests
+- `npm run lint` - Lint code
+
+## Estrutura
+
+```
+src/
+├── api/
+│   └── client.ts       # API client
+├── components/
+│   ├── Friends.tsx     # Friends management
+│   ├── Layout.tsx      # App layout
+│   ├── Leaderboard.tsx # Player rankings
+│   ├── MatchForm.tsx   # Log new match
+│   ├── MatchHistory.tsx
+│   ├── PendingMatches.tsx
+│   └── PlayerProfile.tsx
+├── contexts/
+│   ├── AuthContext.tsx # Google OAuth + JWT
+│   └── DataContext.tsx # Data fetching
+├── pages/
+│   └── Home.tsx
+├── types/
+│   └── index.ts
+└── utils/
+    ├── elo.ts          # ELO calculations
+    └── tennis.ts       # Score validation
+```
+
+## Features
+
+- 🔐 Google OAuth login
+- 👥 Friends system (only play with friends)
+- 🎯 Match logging with set scores
+- ✅ Match confirmation (opponent must approve)
+- 📊 ELO ranking system
+- 📱 Mobile-friendly (PWA-ready)
+
+## Tech Stack
+
+- **React 19** with TypeScript
+- **Vite** for fast builds
+- **MUI (Material-UI)** components
+- **React Router** for navigation
+- **@react-oauth/google** for auth
