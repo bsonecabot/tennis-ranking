@@ -19,12 +19,16 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { calculateEloChange } from "../utils/elo";
-import type { Player, Match, PendingMatch } from "../types";
+import type { Player, Match, PendingMatch, FriendRequest, Friendship } from "../types";
+import { useAuth } from "./AuthContext";
 
 interface DataContextType {
   players: Player[];
   matches: Match[];
   pendingMatches: PendingMatch[];
+  friendRequests: FriendRequest[];
+  friendships: Friendship[];
+  friends: Player[];
   submitMatch: (
     winner: Player,
     loser: Player,
@@ -36,6 +40,10 @@ interface DataContextType {
   ) => Promise<void>;
   approveMatch: (pendingMatch: PendingMatch) => Promise<void>;
   rejectMatch: (pendingMatchId: string) => Promise<void>;
+  sendFriendRequest: (toPlayer: Player) => Promise<void>;
+  acceptFriendRequest: (request: FriendRequest) => Promise<void>;
+  rejectFriendRequest: (requestId: string) => Promise<void>;
+  isFriend: (uid: string) => boolean;
   loading: boolean;
 }
 
@@ -46,10 +54,24 @@ export function useData() {
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { player: currentPlayer } = useAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [pendingMatches, setPendingMatches] = useState<PendingMatch[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [friendships, setFriendships] = useState<Friendship[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Compute friends list from friendships
+  const friendUids = friendships.flatMap((f) =>
+    f.user1Uid === currentPlayer?.uid ? [f.user2Uid] : [f.user1Uid]
+  );
+  const friends = players.filter((p) => friendUids.includes(p.uid));
+
+  const isFriend = useCallback(
+    (uid: string) => friendUids.includes(uid),
+    [friendUids]
+  );
 
   useEffect(() => {
     const playersQuery = query(
@@ -93,6 +115,45 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unsubPending();
     };
   }, []);
+
+  // Subscribe to friend requests (where I'm the recipient)
+  useEffect(() => {
+    if (!currentPlayer) return;
+
+    const requestsQuery = query(
+      collection(db, "friendRequests"),
+      where("toUid", "==", currentPlayer.uid),
+      where("status", "==", "pending")
+    );
+    const unsubRequests = onSnapshot(requestsQuery, (snapshot) => {
+      const requestList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as FriendRequest[];
+      setFriendRequests(requestList);
+    });
+
+    return () => unsubRequests();
+  }, [currentPlayer]);
+
+  // Subscribe to friendships (where I'm either user)
+  useEffect(() => {
+    if (!currentPlayer) return;
+
+    const friendshipsQuery = query(
+      collection(db, "friendships"),
+      where("users", "array-contains", currentPlayer.uid)
+    );
+    const unsubFriendships = onSnapshot(friendshipsQuery, (snapshot) => {
+      const friendshipList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Friendship[];
+      setFriendships(friendshipList);
+    });
+
+    return () => unsubFriendships();
+  }, [currentPlayer]);
 
   // Submit a match for approval (goes to pending)
   const submitMatch = useCallback(
@@ -195,15 +256,74 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await deleteDoc(doc(db, "pendingMatches", pendingMatchId));
   }, []);
 
+  // Send a friend request
+  const sendFriendRequest = useCallback(
+    async (toPlayer: Player) => {
+      if (!currentPlayer) throw new Error("Not logged in");
+
+      const requestData: Omit<FriendRequest, "id"> = {
+        fromUid: currentPlayer.uid,
+        fromName: currentPlayer.displayName,
+        fromPhotoURL: currentPlayer.photoURL,
+        toUid: toPlayer.uid,
+        toName: toPlayer.displayName,
+        toPhotoURL: toPlayer.photoURL,
+        status: "pending",
+        createdAt: Date.now(),
+      };
+
+      await addDoc(collection(db, "friendRequests"), requestData);
+    },
+    [currentPlayer]
+  );
+
+  // Accept a friend request
+  const acceptFriendRequest = useCallback(
+    async (request: FriendRequest) => {
+      if (!currentPlayer) throw new Error("Not logged in");
+
+      // Create friendship (sort UIDs for consistent querying)
+      const sortedUids = [request.fromUid, request.toUid].sort() as [string, string];
+      const friendshipData: Omit<Friendship, "id"> = {
+        users: sortedUids,
+        user1Uid: request.fromUid,
+        user1Name: request.fromName,
+        user1PhotoURL: request.fromPhotoURL,
+        user2Uid: request.toUid,
+        user2Name: request.toName,
+        user2PhotoURL: request.toPhotoURL,
+        createdAt: Date.now(),
+      };
+
+      await addDoc(collection(db, "friendships"), friendshipData);
+
+      // Delete the request
+      await deleteDoc(doc(db, "friendRequests", request.id));
+    },
+    [currentPlayer]
+  );
+
+  // Reject a friend request
+  const rejectFriendRequest = useCallback(async (requestId: string) => {
+    await deleteDoc(doc(db, "friendRequests", requestId));
+  }, []);
+
   return (
     <DataContext.Provider
       value={{
         players,
         matches,
         pendingMatches,
+        friendRequests,
+        friendships,
+        friends,
         submitMatch,
         approveMatch,
         rejectMatch,
+        sendFriendRequest,
+        acceptFriendRequest,
+        rejectFriendRequest,
+        isFriend,
         loading,
       }}
     >

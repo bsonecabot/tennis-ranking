@@ -44,3 +44,27 @@ export interface PendingMatch {
   recordedBy: string;
   status: "pending" | "approved" | "rejected";
 }
+
+export interface FriendRequest {
+  id: string;
+  fromUid: string;
+  fromName: string;
+  fromPhotoURL: string;
+  toUid: string;
+  toName: string;
+  toPhotoURL: string;
+  status: "pending" | "accepted" | "rejected";
+  createdAt: number;
+}
+
+export interface Friendship {
+  id: string;
+  users: [string, string]; // sorted UIDs for consistent querying
+  user1Uid: string;
+  user1Name: string;
+  user1PhotoURL: string;
+  user2Uid: string;
+  user2Name: string;
+  user2PhotoURL: string;
+  createdAt: number;
+}

@@ -26,7 +26,7 @@ interface SetScore {
 
 export default function MatchForm() {
   const { player: currentPlayer } = useAuth();
-  const { players, submitMatch } = useData();
+  const { friends, submitMatch } = useData();
 
   const [opponent, setOpponent] = useState<Player | null>(null);
   const [matchDate, setMatchDate] = useState(
@@ -37,10 +37,8 @@ export default function MatchForm() {
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Filter out current player from opponent options
-  const opponentOptions = players.filter(
-    (p) => p.uid !== currentPlayer?.uid
-  );
+  // Only friends can be opponents
+  const opponentOptions = friends;
 
   const addSet = () => {
     setSets([...sets, { me: "", opponent: "", tiebreak: "" }]);

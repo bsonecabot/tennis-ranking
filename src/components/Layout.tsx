@@ -20,14 +20,15 @@ import {
   Leaderboard as LeaderboardIcon,
   AddCircle as AddCircleIcon,
   History as HistoryIcon,
+  People as PeopleIcon,
   SportsTennis as TennisIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 
 const navItems = [
   { label: "Home", icon: <HomeIcon />, path: "/" },
-  { label: "Rankings", icon: <LeaderboardIcon />, path: "/rankings" },
-  { label: "Log Match", icon: <AddCircleIcon />, path: "/log-match" },
+  { label: "Friends", icon: <PeopleIcon />, path: "/friends" },
+  { label: "Log", icon: <AddCircleIcon />, path: "/log-match" },
   { label: "History", icon: <HistoryIcon />, path: "/history" },
 ];
 

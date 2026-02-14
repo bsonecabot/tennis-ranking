@@ -8,6 +8,7 @@ import Leaderboard from "./components/Leaderboard";
 import MatchForm from "./components/MatchForm";
 import MatchHistory from "./components/MatchHistory";
 import PlayerProfile from "./components/PlayerProfile";
+import Friends from "./components/Friends";
 
 const theme = createTheme({
   palette: {
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/rankings" element={<Leaderboard />} />
                 <Route path="/log-match" element={<MatchForm />} />
                 <Route path="/history" element={<MatchHistory />} />
+                <Route path="/friends" element={<Friends />} />
                 <Route path="/player/:uid" element={<PlayerProfile />} />
               </Route>
             </Routes>
