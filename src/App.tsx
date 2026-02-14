@@ -3,6 +3,7 @@ import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DataProvider } from "./contexts/DataContext";
 import Layout from "./components/Layout";
+import Home from "./pages/Home";
 import Leaderboard from "./components/Leaderboard";
 import MatchForm from "./components/MatchForm";
 import MatchHistory from "./components/MatchHistory";
@@ -27,7 +28,8 @@ export default function App() {
           <DataProvider>
             <Routes>
               <Route element={<Layout />}>
-                <Route path="/" element={<Leaderboard />} />
+                <Route path="/" element={<Home />} />
+                <Route path="/rankings" element={<Leaderboard />} />
                 <Route path="/log-match" element={<MatchForm />} />
                 <Route path="/history" element={<MatchHistory />} />
                 <Route path="/player/:uid" element={<PlayerProfile />} />

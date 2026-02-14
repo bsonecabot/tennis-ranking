@@ -16,16 +16,17 @@ import {
   CircularProgress,
 } from "@mui/material";
 import {
+  Home as HomeIcon,
   Leaderboard as LeaderboardIcon,
   AddCircle as AddCircleIcon,
   History as HistoryIcon,
   SportsTennis as TennisIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import PendingMatches from "./PendingMatches";
 
 const navItems = [
-  { label: "Rankings", icon: <LeaderboardIcon />, path: "/" },
+  { label: "Home", icon: <HomeIcon />, path: "/" },
+  { label: "Rankings", icon: <LeaderboardIcon />, path: "/rankings" },
   { label: "Log Match", icon: <AddCircleIcon />, path: "/log-match" },
   { label: "History", icon: <HistoryIcon />, path: "/history" },
 ];
@@ -123,7 +124,6 @@ export default function Layout() {
       </AppBar>
 
       <Box sx={{ p: 2, maxWidth: 600, mx: "auto" }}>
-        <PendingMatches />
         <Outlet />
       </Box>
 
