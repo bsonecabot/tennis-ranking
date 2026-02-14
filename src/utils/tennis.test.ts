@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidTennisSet, determineMatchWinner, formatMatchScore } from './tennis';
+import { isValidTennisSet, isTiebreakSet, determineMatchWinner, formatMatchScore } from './tennis';
 
 describe('isValidTennisSet', () => {
   describe('valid sets', () => {
@@ -80,6 +80,25 @@ describe('isValidTennisSet', () => {
   });
 });
 
+describe('isTiebreakSet', () => {
+  it('should detect 7-6 as tiebreak', () => {
+    expect(isTiebreakSet(7, 6)).toBe(true);
+    expect(isTiebreakSet(6, 7)).toBe(true);
+  });
+
+  it('should detect 9-8 as pro-set tiebreak', () => {
+    expect(isTiebreakSet(9, 8)).toBe(true);
+    expect(isTiebreakSet(8, 9)).toBe(true);
+  });
+
+  it('should return false for non-tiebreak sets', () => {
+    expect(isTiebreakSet(6, 4)).toBe(false);
+    expect(isTiebreakSet(7, 5)).toBe(false);
+    expect(isTiebreakSet(8, 6)).toBe(false);
+    expect(isTiebreakSet(9, 7)).toBe(false);
+  });
+});
+
 describe('determineMatchWinner', () => {
   it('should handle 1-set match', () => {
     const sets = [{ player1: 6, player2: 4 }];
@@ -153,5 +172,35 @@ describe('formatMatchScore', () => {
       { player1: 6, player2: 2 },
     ];
     expect(formatMatchScore(sets, 1)).toBe('6-3, 4-6, 6-2');
+  });
+
+  it('should format tiebreak set as 7-6(x) where x is loser points', () => {
+    const sets = [
+      { player1: 7, player2: 6, tiebreak: 4 },
+    ];
+    expect(formatMatchScore(sets, 1)).toBe('7-6(4)');
+  });
+
+  it('should format tiebreak when player 2 wins', () => {
+    const sets = [
+      { player1: 6, player2: 7, tiebreak: 5 },
+    ];
+    expect(formatMatchScore(sets, 2)).toBe('7-6(5)');
+  });
+
+  it('should format pro-set tiebreak as 9-8(x)', () => {
+    const sets = [
+      { player1: 9, player2: 8, tiebreak: 6 },
+    ];
+    expect(formatMatchScore(sets, 1)).toBe('9-8(6)');
+  });
+
+  it('should handle mixed sets with and without tiebreaks', () => {
+    const sets = [
+      { player1: 6, player2: 4 },
+      { player1: 6, player2: 7, tiebreak: 3 },
+      { player1: 6, player2: 2 },
+    ];
+    expect(formatMatchScore(sets, 1)).toBe('6-4, 6-7(3), 6-2');
   });
 });

@@ -1,4 +1,13 @@
 /**
+ * Checks if a set score is a tiebreak (7-6 or 9-8).
+ */
+export function isTiebreakSet(a: number, b: number): boolean {
+  const high = Math.max(a, b);
+  const low = Math.min(a, b);
+  return (high === 7 && low === 6) || (high === 9 && low === 8);
+}
+
+/**
  * Validates if a score represents a valid tennis set.
  * Valid sets:
  * - 6-0, 6-1, 6-2, 6-3, 6-4 (normal win)
@@ -52,16 +61,24 @@ export function determineMatchWinner(
 }
 
 /**
- * Formats match score as a string (e.g., "6-4, 7-5").
+ * Formats match score as a string (e.g., "6-4, 7-6(4)").
  */
 export function formatMatchScore(
-  sets: Array<{ player1: number; player2: number }>,
+  sets: Array<{ player1: number; player2: number; tiebreak?: number }>,
   winner: 1 | 2
 ): string {
   return sets
     .filter((s) => s.player1 > 0 || s.player2 > 0)
-    .map((s) =>
-      winner === 1 ? `${s.player1}-${s.player2}` : `${s.player2}-${s.player1}`
-    )
+    .map((s) => {
+      const winnerScore = winner === 1 ? s.player1 : s.player2;
+      const loserScore = winner === 1 ? s.player2 : s.player1;
+      const base = `${winnerScore}-${loserScore}`;
+      
+      // Add tiebreak score if present
+      if (s.tiebreak !== undefined && isTiebreakSet(s.player1, s.player2)) {
+        return `${base}(${s.tiebreak})`;
+      }
+      return base;
+    })
     .join(", ");
 }

@@ -15,12 +15,13 @@ import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import { useAuth } from "../contexts/AuthContext";
 import { useData } from "../contexts/DataContext";
-import { isValidTennisSet } from "../utils/tennis";
+import { isValidTennisSet, isTiebreakSet } from "../utils/tennis";
 import type { Player } from "../types";
 
 interface SetScore {
   me: string;
   opponent: string;
+  tiebreak: string;
 }
 
 export default function MatchForm() {
@@ -31,7 +32,7 @@ export default function MatchForm() {
   const [matchDate, setMatchDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [sets, setSets] = useState<SetScore[]>([{ me: "", opponent: "" }]);
+  const [sets, setSets] = useState<SetScore[]>([{ me: "", opponent: "", tiebreak: "" }]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +43,7 @@ export default function MatchForm() {
   );
 
   const addSet = () => {
-    setSets([...sets, { me: "", opponent: "" }]);
+    setSets([...sets, { me: "", opponent: "", tiebreak: "" }]);
   };
 
   const removeSet = () => {
@@ -53,11 +54,11 @@ export default function MatchForm() {
 
   const updateSet = (
     index: number,
-    player: "me" | "opponent",
+    field: "me" | "opponent" | "tiebreak",
     value: string
   ) => {
     const newSets = [...sets];
-    newSets[index][player] = value;
+    newSets[index][field] = value;
     setSets(newSets);
   };
 
@@ -84,7 +85,7 @@ export default function MatchForm() {
     // Count sets won by each player
     let mySets = 0;
     let opponentSets = 0;
-    const validSets: { me: number; opp: number }[] = [];
+    const validSets: { me: number; opp: number; tiebreak?: number }[] = [];
 
     for (const set of sets) {
       const me = parseInt(set.me, 10);
@@ -106,7 +107,16 @@ export default function MatchForm() {
         return;
       }
 
-      validSets.push({ me, opp });
+      // Parse tiebreak if present
+      const setData: { me: number; opp: number; tiebreak?: number } = { me, opp };
+      if (isTiebreakSet(me, opp) && set.tiebreak !== "") {
+        const tb = parseInt(set.tiebreak, 10);
+        if (!isNaN(tb) && tb >= 0) {
+          setData.tiebreak = tb;
+        }
+      }
+
+      validSets.push(setData);
 
       if (me > opp) mySets++;
       else opponentSets++;
@@ -131,7 +141,15 @@ export default function MatchForm() {
 
     // Format score string (from winner's perspective)
     const scoreStr = validSets
-      .map((s) => (iWon ? `${s.me}-${s.opp}` : `${s.opp}-${s.me}`))
+      .map((s) => {
+        const winnerScore = iWon ? s.me : s.opp;
+        const loserScore = iWon ? s.opp : s.me;
+        const base = `${winnerScore}-${loserScore}`;
+        if (s.tiebreak !== undefined && isTiebreakSet(s.me, s.opp)) {
+          return `${base}(${s.tiebreak})`;
+        }
+        return base;
+      })
       .join(", ");
 
     // Parse match date
@@ -152,7 +170,7 @@ export default function MatchForm() {
         `Match submitted for approval! ${opponent.displayName} needs to confirm.`
       );
       setOpponent(null);
-      setSets([{ me: "", opponent: "" }]);
+      setSets([{ me: "", opponent: "", tiebreak: "" }]);
       setMatchDate(new Date().toISOString().split("T")[0]);
     } catch {
       setError("Failed to record match. Please try again.");
@@ -234,36 +252,57 @@ export default function MatchForm() {
 
           {/* Set scores */}
           <Box display="flex" gap={1} flexWrap="wrap">
-            {sets.map((set, index) => (
-              <Box key={index} display="flex" alignItems="center" gap={0.5}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ minWidth: 50 }}
-                >
-                  Set {index + 1}:
-                </Typography>
-                <TextField
-                  size="small"
-                  type="number"
-                  value={set.me}
-                  onChange={(e) => updateSet(index, "me", e.target.value)}
-                  sx={{ width: 60 }}
-                  inputProps={{ min: 0, max: 9 }}
-                  placeholder="You"
-                />
-                <Typography>-</Typography>
-                <TextField
-                  size="small"
-                  type="number"
-                  value={set.opponent}
-                  onChange={(e) => updateSet(index, "opponent", e.target.value)}
-                  sx={{ width: 60 }}
-                  inputProps={{ min: 0, max: 9 }}
-                  placeholder={opponent?.displayName?.split(" ")[0] || "Opp"}
-                />
-              </Box>
-            ))}
+            {sets.map((set, index) => {
+              const me = parseInt(set.me, 10);
+              const opp = parseInt(set.opponent, 10);
+              const showTiebreak = !isNaN(me) && !isNaN(opp) && isTiebreakSet(me, opp);
+              
+              return (
+                <Box key={index} display="flex" alignItems="center" gap={0.5}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ minWidth: 50 }}
+                  >
+                    Set {index + 1}:
+                  </Typography>
+                  <TextField
+                    size="small"
+                    type="number"
+                    value={set.me}
+                    onChange={(e) => updateSet(index, "me", e.target.value)}
+                    sx={{ width: 60 }}
+                    inputProps={{ min: 0 }}
+                    placeholder="You"
+                  />
+                  <Typography>-</Typography>
+                  <TextField
+                    size="small"
+                    type="number"
+                    value={set.opponent}
+                    onChange={(e) => updateSet(index, "opponent", e.target.value)}
+                    sx={{ width: 60 }}
+                    inputProps={{ min: 0 }}
+                    placeholder={opponent?.displayName?.split(" ")[0] || "Opp"}
+                  />
+                  {showTiebreak && (
+                    <>
+                      <Typography variant="body2" color="text.secondary">(</Typography>
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={set.tiebreak}
+                        onChange={(e) => updateSet(index, "tiebreak", e.target.value)}
+                        sx={{ width: 50 }}
+                        inputProps={{ min: 0 }}
+                        placeholder="TB"
+                      />
+                      <Typography variant="body2" color="text.secondary">)</Typography>
+                    </>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
 
           <Typography variant="caption" color="text.secondary">
