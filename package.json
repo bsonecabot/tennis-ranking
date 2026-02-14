@@ -10,8 +10,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "deploy:dev": "npm run build && firebase deploy --only hosting:dev",
-    "deploy:prod": "npm run build && firebase deploy --only hosting:prod"
+    "build:dev": "vite build --mode development",
+    "build:prod": "tsc -b && vite build --mode production",
+    "deploy:dev": "npm run build:dev && firebase use dev && firebase deploy --only hosting:dev",
+    "deploy:prod": "npm run build:prod && firebase use prod && firebase deploy --only hosting:prod"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
