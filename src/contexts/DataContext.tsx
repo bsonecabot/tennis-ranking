@@ -14,21 +14,28 @@ import {
   addDoc,
   doc,
   runTransaction,
+  deleteDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { calculateEloChange } from "../utils/elo";
-import type { Player, Match } from "../types";
+import type { Player, Match, PendingMatch } from "../types";
 
 interface DataContextType {
   players: Player[];
   matches: Match[];
-  recordMatch: (
+  pendingMatches: PendingMatch[];
+  submitMatch: (
     winner: Player,
     loser: Player,
     winnerScore: number,
     loserScore: number,
-    recordedBy: string
+    recordedBy: string,
+    scoreDetails?: string,
+    playedAt?: number
   ) => Promise<void>;
+  approveMatch: (pendingMatch: PendingMatch) => Promise<void>;
+  rejectMatch: (pendingMatchId: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -41,6 +48,7 @@ export function useData() {
 export function DataProvider({ children }: { children: ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [pendingMatches, setPendingMatches] = useState<PendingMatch[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,20 +74,71 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setMatches(matchList);
     });
 
+    const pendingQuery = query(
+      collection(db, "pendingMatches"),
+      where("status", "==", "pending"),
+      orderBy("createdAt", "desc")
+    );
+    const unsubPending = onSnapshot(pendingQuery, (snapshot) => {
+      const pendingList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as PendingMatch[];
+      setPendingMatches(pendingList);
+    });
+
     return () => {
       unsubPlayers();
       unsubMatches();
+      unsubPending();
     };
   }, []);
 
-  const recordMatch = useCallback(
+  // Submit a match for approval (goes to pending)
+  const submitMatch = useCallback(
     async (
       winner: Player,
       loser: Player,
       winnerScore: number,
       loserScore: number,
-      recordedBy: string
+      recordedBy: string,
+      scoreDetails?: string,
+      playedAt?: number
     ) => {
+      const pendingData: Omit<PendingMatch, "id"> = {
+        winnerId: winner.uid,
+        winnerName: winner.displayName,
+        winnerPhotoURL: winner.photoURL,
+        loserId: loser.uid,
+        loserName: loser.displayName,
+        loserPhotoURL: loser.photoURL,
+        winnerScore,
+        loserScore,
+        playedAt: playedAt || Date.now(),
+        createdAt: Date.now(),
+        recordedBy,
+        status: "pending",
+      };
+
+      if (scoreDetails) {
+        pendingData.scoreDetails = scoreDetails;
+      }
+
+      await addDoc(collection(db, "pendingMatches"), pendingData);
+    },
+    []
+  );
+
+  // Approve a pending match - update ELO and create confirmed match
+  const approveMatch = useCallback(
+    async (pendingMatch: PendingMatch) => {
+      const winner = players.find((p) => p.uid === pendingMatch.winnerId);
+      const loser = players.find((p) => p.uid === pendingMatch.loserId);
+
+      if (!winner || !loser) {
+        throw new Error("Players not found");
+      }
+
       const { winnerChange, loserChange } = calculateEloChange(
         winner.elo,
         loser.elo
@@ -102,26 +161,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
         });
       });
 
-      await addDoc(collection(db, "matches"), {
-        winnerId: winner.uid,
-        winnerName: winner.displayName,
-        winnerPhotoURL: winner.photoURL,
-        loserId: loser.uid,
-        loserName: loser.displayName,
-        loserPhotoURL: loser.photoURL,
-        winnerScore,
-        loserScore,
+      // Create confirmed match
+      const matchData: Omit<Match, "id"> = {
+        winnerId: pendingMatch.winnerId,
+        winnerName: pendingMatch.winnerName,
+        winnerPhotoURL: pendingMatch.winnerPhotoURL,
+        loserId: pendingMatch.loserId,
+        loserName: pendingMatch.loserName,
+        loserPhotoURL: pendingMatch.loserPhotoURL,
+        winnerScore: pendingMatch.winnerScore,
+        loserScore: pendingMatch.loserScore,
+        playedAt: pendingMatch.playedAt,
         winnerEloChange: winnerChange,
         loserEloChange: loserChange,
-        createdAt: Date.now(),
-        recordedBy,
-      } satisfies Omit<Match, "id">);
+        createdAt: pendingMatch.createdAt,
+        recordedBy: pendingMatch.recordedBy,
+      };
+
+      if (pendingMatch.scoreDetails) {
+        matchData.scoreDetails = pendingMatch.scoreDetails;
+      }
+
+      await addDoc(collection(db, "matches"), matchData);
+
+      // Delete pending match
+      await deleteDoc(doc(db, "pendingMatches", pendingMatch.id));
     },
-    []
+    [players]
   );
 
+  // Reject a pending match
+  const rejectMatch = useCallback(async (pendingMatchId: string) => {
+    await deleteDoc(doc(db, "pendingMatches", pendingMatchId));
+  }, []);
+
   return (
-    <DataContext.Provider value={{ players, matches, recordMatch, loading }}>
+    <DataContext.Provider
+      value={{
+        players,
+        matches,
+        pendingMatches,
+        submitMatch,
+        approveMatch,
+        rejectMatch,
+        loading,
+      }}
+    >
       {children}
     </DataContext.Provider>
   );

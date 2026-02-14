@@ -22,6 +22,7 @@ import {
   SportsTennis as TennisIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
+import PendingMatches from "./PendingMatches";
 
 const navItems = [
   { label: "Rankings", icon: <LeaderboardIcon />, path: "/" },
@@ -122,6 +123,7 @@ export default function Layout() {
       </AppBar>
 
       <Box sx={{ p: 2, maxWidth: 600, mx: "auto" }}>
+        <PendingMatches />
         <Outlet />
       </Box>
 

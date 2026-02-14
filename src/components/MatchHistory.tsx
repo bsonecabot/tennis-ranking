@@ -16,8 +16,6 @@ function formatDate(timestamp: number): string {
     month: "short",
     day: "numeric",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 }
 
@@ -74,9 +72,9 @@ export default function MatchHistory() {
                 </Box>
               }
               secondary={
-                <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                <Box display="flex" alignItems="center" gap={1} mt={0.5} flexWrap="wrap">
                   <Chip
-                    label={`${match.winnerScore} - ${match.loserScore}`}
+                    label={match.scoreDetails || `${match.winnerScore} - ${match.loserScore}`}
                     size="small"
                     color="primary"
                   />
@@ -93,7 +91,7 @@ export default function MatchHistory() {
                     variant="outlined"
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {formatDate(match.createdAt)}
+                    {formatDate(match.playedAt || match.createdAt)}
                   </Typography>
                 </Box>
               }
