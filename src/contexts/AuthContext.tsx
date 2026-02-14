@@ -3,27 +3,19 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
   type ReactNode,
 } from "react";
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  signOut,
-  type User,
-} from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, googleProvider, db } from "../config/firebase";
-import { DEFAULT_ELO } from "../utils/elo";
-import type { Player } from "../types";
+import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
+import { api, type ApiPlayer } from "../api/client";
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
 interface AuthContextType {
-  user: User | null;
-  player: Player | null;
+  player: ApiPlayer | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  logout: () => Promise<void>;
+  signInWithGoogle: () => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -32,79 +24,81 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [player, setPlayer] = useState<Player | null>(null);
+function AuthProviderInner({ children }: { children: ReactNode }) {
+  const [player, setPlayer] = useState<ApiPlayer | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Handle redirect result on page load
+  // Check for existing token on mount
   useEffect(() => {
-    getRedirectResult(auth).catch(() => {
-      // Ignore redirect errors on fresh page load
-    });
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        const playerRef = doc(db, "players", firebaseUser.uid);
-        const playerSnap = await getDoc(playerRef);
-
-        if (playerSnap.exists()) {
-          setPlayer(playerSnap.data() as Player);
-        } else {
-          const newPlayer: Player = {
-            uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName || "Anonymous",
-            email: firebaseUser.email || "",
-            photoURL: firebaseUser.photoURL || "",
-            elo: DEFAULT_ELO,
-            wins: 0,
-            losses: 0,
-            matchesPlayed: 0,
-            createdAt: Date.now(),
-          };
-          await setDoc(playerRef, newPlayer);
-          setPlayer(newPlayer);
+    const checkAuth = async () => {
+      const token = api.getToken();
+      if (token) {
+        try {
+          const me = await api.getMe();
+          setPlayer(me);
+        } catch (error) {
+          console.error("Token invalid, clearing:", error);
+          api.setToken(null);
         }
-      } else {
-        setPlayer(null);
       }
       setLoading(false);
-    });
-
-    return unsubscribe;
+    };
+    checkAuth();
   }, []);
 
-  async function signInWithGoogle() {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: unknown) {
-      // If popup fails (blocked or storage issues), fallback to redirect
-      const err = error as { code?: string };
-      if (
-        err?.code === "auth/popup-blocked" ||
-        err?.code === "auth/popup-closed-by-user" ||
-        err?.code === "auth/cancelled-popup-request" ||
-        err?.code === "auth/internal-error"
-      ) {
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        throw error;
-      }
-    }
-  }
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        // Get user info from Google
+        const userInfoResponse = await fetch(
+          "https://www.googleapis.com/oauth2/v3/userinfo",
+          {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          }
+        );
+        const userInfo = await userInfoResponse.json();
 
-  async function logout() {
-    await signOut(auth);
-  }
+        // Send to our API
+        const { token, player } = await api.loginWithGoogle({
+          googleId: userInfo.sub,
+          email: userInfo.email,
+          displayName: userInfo.name,
+          photoURL: userInfo.picture,
+        });
+
+        api.setToken(token);
+        setPlayer(player);
+      } catch (error) {
+        console.error("Login error:", error);
+        alert("Login failed. Please try again.");
+      }
+    },
+    onError: (error) => {
+      console.error("Google login error:", error);
+      alert("Google login failed. Please try again.");
+    },
+  });
+
+  const signInWithGoogle = useCallback(() => {
+    googleLogin();
+  }, [googleLogin]);
+
+  const logout = useCallback(() => {
+    api.setToken(null);
+    setPlayer(null);
+  }, []);
 
   return (
-    <AuthContext.Provider
-      value={{ user, player, loading, signInWithGoogle, logout }}
-    >
+    <AuthContext.Provider value={{ player, loading, signInWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
+  );
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AuthProviderInner>{children}</AuthProviderInner>
+    </GoogleOAuthProvider>
   );
 }

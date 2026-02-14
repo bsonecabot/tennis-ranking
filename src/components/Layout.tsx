@@ -17,7 +17,6 @@ import {
 } from "@mui/material";
 import {
   Home as HomeIcon,
-  Leaderboard as LeaderboardIcon,
   AddCircle as AddCircleIcon,
   History as HistoryIcon,
   People as PeopleIcon,
@@ -33,7 +32,7 @@ const navItems = [
 ];
 
 export default function Layout() {
-  const { user, player, loading, signInWithGoogle, logout } = useAuth();
+  const { player, loading, signInWithGoogle, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -55,7 +54,11 @@ export default function Layout() {
     );
   }
 
-  if (!user || !player) {
+  if (!player) {
+    const handleSignIn = () => {
+      signInWithGoogle();
+    };
+
     return (
       <Box
         display="flex"
@@ -75,7 +78,7 @@ export default function Layout() {
         <Button
           variant="contained"
           size="large"
-          onClick={signInWithGoogle}
+          onClick={handleSignIn}
           sx={{ mt: 2 }}
         >
           Sign in with Google
@@ -94,7 +97,7 @@ export default function Layout() {
           </Typography>
           <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
             <Avatar
-              src={player.photoURL}
+              src={player.photoURL || undefined}
               alt={player.displayName}
               sx={{ width: 32, height: 32 }}
             />
@@ -107,7 +110,7 @@ export default function Layout() {
             <MenuItem
               onClick={() => {
                 setAnchorEl(null);
-                navigate(`/player/${player.uid}`);
+                navigate(`/player/${player.id}`);
               }}
             >
               My Profile ({player.elo} ELO)

@@ -16,7 +16,7 @@ import RemoveIcon from "@mui/icons-material/Remove";
 import { useAuth } from "../contexts/AuthContext";
 import { useData } from "../contexts/DataContext";
 import { isValidTennisSet, isTiebreakSet } from "../utils/tennis";
-import type { Player } from "../types";
+import type { ApiPlayer } from "../api/client";
 
 interface SetScore {
   me: string;
@@ -28,7 +28,7 @@ export default function MatchForm() {
   const { player: currentPlayer } = useAuth();
   const { friends, submitMatch } = useData();
 
-  const [opponent, setOpponent] = useState<Player | null>(null);
+  const [opponent, setOpponent] = useState<ApiPlayer | null>(null);
   const [matchDate, setMatchDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -36,9 +36,6 @@ export default function MatchForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  // Only friends can be opponents
-  const opponentOptions = friends;
 
   const addSet = () => {
     setSets([...sets, { me: "", opponent: "", tiebreak: "" }]);
@@ -72,11 +69,6 @@ export default function MatchForm() {
 
     if (!opponent) {
       setError("Select an opponent.");
-      return;
-    }
-
-    if (!matchDate) {
-      setError("Select a match date.");
       return;
     }
 
@@ -130,12 +122,9 @@ export default function MatchForm() {
       return;
     }
 
-    // Determine winner and loser
+    // Determine winner
     const iWon = mySets > opponentSets;
-    const winner = iWon ? currentPlayer : opponent;
-    const loser = iWon ? opponent : currentPlayer;
-    const winnerSets = Math.max(mySets, opponentSets);
-    const loserSets = Math.min(mySets, opponentSets);
+    const winnerId = iWon ? currentPlayer.id : opponent.id;
 
     // Format score string (from winner's perspective)
     const scoreStr = validSets
@@ -150,28 +139,17 @@ export default function MatchForm() {
       })
       .join(", ");
 
-    // Parse match date
-    const playedAt = new Date(matchDate).getTime();
-
     try {
       setSubmitting(true);
-      await submitMatch(
-        winner,
-        loser,
-        winnerSets,
-        loserSets,
-        currentPlayer.uid,
-        scoreStr,
-        playedAt
-      );
+      await submitMatch(opponent.id, winnerId, scoreStr);
       setSuccess(
         `Match submitted for approval! ${opponent.displayName} needs to confirm.`
       );
       setOpponent(null);
       setSets([{ me: "", opponent: "", tiebreak: "" }]);
       setMatchDate(new Date().toISOString().split("T")[0]);
-    } catch {
-      setError("Failed to record match. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to record match. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -201,7 +179,7 @@ export default function MatchForm() {
               You
             </Typography>
             <Chip
-              avatar={<Avatar src={currentPlayer.photoURL} />}
+              avatar={<Avatar src={currentPlayer.photoURL || undefined} />}
               label={`${currentPlayer.displayName} (${currentPlayer.elo})`}
               sx={{ mt: 0.5 }}
             />
@@ -209,14 +187,15 @@ export default function MatchForm() {
 
           {/* Opponent selector */}
           <Autocomplete
-            options={opponentOptions}
+            options={friends}
             getOptionLabel={(p) => `${p.displayName} (${p.elo})`}
             value={opponent}
             onChange={(_, val) => setOpponent(val)}
             renderInput={(params) => (
-              <TextField {...params} label="Opponent" required />
+              <TextField {...params} label="Opponent (from friends)" required />
             )}
-            isOptionEqualToValue={(opt, val) => opt.uid === val.uid}
+            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+            noOptionsText="Add friends to log matches"
           />
 
           {/* Match date */}
@@ -311,7 +290,7 @@ export default function MatchForm() {
             type="submit"
             variant="contained"
             size="large"
-            disabled={submitting}
+            disabled={submitting || !opponent}
           >
             {submitting ? "Submitting..." : "Submit Match"}
           </Button>

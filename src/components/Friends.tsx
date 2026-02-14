@@ -11,61 +11,76 @@ import {
   Paper,
   Alert,
   Chip,
-  Autocomplete,
   TextField,
   Button,
+  CircularProgress,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import SearchIcon from "@mui/icons-material/Search";
 import { useAuth } from "../contexts/AuthContext";
 import { useData } from "../contexts/DataContext";
-import type { Player } from "../types";
+import type { ApiPlayer } from "../api/client";
 
 export default function Friends() {
   const { player: currentPlayer } = useAuth();
   const {
-    players,
     friends,
     friendRequests,
     sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,
+    searchPlayers,
     isFriend,
   } = useData();
 
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [sending, setSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ApiPlayer[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Players that can be added (not self, not already friends)
-  const availablePlayers = players.filter(
-    (p) => p.uid !== currentPlayer?.uid && !isFriend(p.uid)
-  );
-
-  const handleSendRequest = async () => {
-    if (!selectedPlayer) return;
-    setSending(true);
+  const handleSearch = async () => {
+    if (searchQuery.length < 2) return;
+    setSearching(true);
     setError("");
-    setSuccess("");
     try {
-      await sendFriendRequest(selectedPlayer);
-      setSuccess(`Solicitação enviada para ${selectedPlayer.displayName}!`);
-      setSelectedPlayer(null);
+      const results = await searchPlayers(searchQuery);
+      // Filter out current player and existing friends
+      const filtered = results.filter(
+        (p) => p.id !== currentPlayer?.id && !isFriend(p.id)
+      );
+      setSearchResults(filtered);
     } catch {
-      setError("Erro ao enviar solicitação");
+      setError("Erro ao buscar jogadores");
     } finally {
-      setSending(false);
+      setSearching(false);
     }
   };
 
-  const handleAccept = async (request: typeof friendRequests[0]) => {
-    setProcessing(request.id);
+  const handleSendRequest = async (player: ApiPlayer) => {
+    setSending(player.id);
+    setError("");
+    setSuccess("");
+    try {
+      await sendFriendRequest(player.id);
+      setSuccess(`Solicitação enviada para ${player.displayName}!`);
+      setSearchResults(searchResults.filter((p) => p.id !== player.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao enviar solicitação");
+    } finally {
+      setSending(null);
+    }
+  };
+
+  const handleAccept = async (requestId: string) => {
+    setProcessing(requestId);
     setError("");
     try {
-      await acceptFriendRequest(request);
+      await acceptFriendRequest(requestId);
     } catch {
       setError("Erro ao aceitar solicitação");
     } finally {
@@ -100,32 +115,54 @@ export default function Friends() {
           <PersonAddIcon sx={{ mr: 1, verticalAlign: "middle" }} />
           Adicionar Amigo
         </Typography>
-        <Box display="flex" gap={1}>
-          <Autocomplete
-            options={availablePlayers}
-            getOptionLabel={(p) => p.displayName}
-            value={selectedPlayer}
-            onChange={(_, val) => setSelectedPlayer(val)}
-            renderInput={(params) => (
-              <TextField {...params} label="Buscar jogador" size="small" />
-            )}
-            renderOption={(props, option) => (
-              <li {...props}>
-                <Avatar src={option.photoURL} sx={{ width: 24, height: 24, mr: 1 }} />
-                {option.displayName}
-              </li>
-            )}
+        <Box display="flex" gap={1} mb={2}>
+          <TextField
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+            label="Buscar por nome ou email"
+            size="small"
             sx={{ flex: 1 }}
-            isOptionEqualToValue={(opt, val) => opt.uid === val.uid}
           />
           <Button
             variant="contained"
-            onClick={handleSendRequest}
-            disabled={!selectedPlayer || sending}
+            onClick={handleSearch}
+            disabled={searching || searchQuery.length < 2}
+            startIcon={searching ? <CircularProgress size={20} /> : <SearchIcon />}
           >
-            Adicionar
+            Buscar
           </Button>
         </Box>
+
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <List disablePadding>
+            {searchResults.map((player) => (
+              <ListItem
+                key={player.id}
+                sx={{ bgcolor: "grey.100", borderRadius: 1, mb: 1 }}
+                secondaryAction={
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleSendRequest(player)}
+                    disabled={sending === player.id}
+                  >
+                    {sending === player.id ? "Enviando..." : "Adicionar"}
+                  </Button>
+                }
+              >
+                <ListItemAvatar>
+                  <Avatar src={player.photoURL || undefined} />
+                </ListItemAvatar>
+                <ListItemText
+                  primary={player.displayName}
+                  secondary={`${player.elo} ELO`}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
       </Paper>
 
       {/* Friend Requests */}
@@ -143,7 +180,7 @@ export default function Friends() {
                   <Box>
                     <IconButton
                       color="success"
-                      onClick={() => handleAccept(request)}
+                      onClick={() => handleAccept(request.id)}
                       disabled={processing === request.id}
                     >
                       <CheckIcon />
@@ -159,10 +196,10 @@ export default function Friends() {
                 }
               >
                 <ListItemAvatar>
-                  <Avatar src={request.fromPhotoURL} />
+                  <Avatar src={request.requester?.photoURL || undefined} />
                 </ListItemAvatar>
                 <ListItemText
-                  primary={request.fromName}
+                  primary={request.requester?.displayName || "Unknown"}
                   secondary="quer ser seu amigo"
                 />
               </ListItem>
@@ -178,14 +215,14 @@ export default function Friends() {
         </Typography>
         {friends.length === 0 ? (
           <Typography color="text.secondary">
-            Você ainda não tem amigos. Adicione jogadores acima!
+            Você ainda não tem amigos. Busque jogadores acima!
           </Typography>
         ) : (
           <List disablePadding>
             {friends.map((friend) => (
-              <ListItem key={friend.uid} sx={{ px: 0 }}>
+              <ListItem key={friend.id} sx={{ px: 0 }}>
                 <ListItemAvatar>
-                  <Avatar src={friend.photoURL} />
+                  <Avatar src={friend.photoURL || undefined} />
                 </ListItemAvatar>
                 <ListItemText
                   primary={friend.displayName}

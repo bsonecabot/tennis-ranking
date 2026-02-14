@@ -17,9 +17,10 @@ import {
   SportsTennis as TennisIcon,
 } from "@mui/icons-material";
 import { useData } from "../contexts/DataContext";
+import type { ApiMatch } from "../api/client";
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString(undefined, {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -30,11 +31,11 @@ export default function PlayerProfile() {
   const { uid } = useParams<{ uid: string }>();
   const { players, matches } = useData();
 
-  const player = players.find((p) => p.uid === uid);
+  const player = players.find((p) => p.id === uid);
   const playerMatches = matches.filter(
-    (m) => m.winnerId === uid || m.loserId === uid
+    (m) => m.status === "confirmed" && (m.player1Id === uid || m.player2Id === uid)
   );
-  const rank = players.findIndex((p) => p.uid === uid) + 1;
+  const rank = players.findIndex((p) => p.id === uid) + 1;
 
   if (!player) {
     return (
@@ -51,11 +52,21 @@ export default function PlayerProfile() {
       ? Math.round((player.wins / player.matchesPlayed) * 100)
       : 0;
 
+  const getMatchInfo = (match: ApiMatch) => {
+    const isWinner = match.winnerId === uid;
+    const winner = match.player1Id === match.winnerId ? match.player1 : match.player2;
+    const loser = match.player1Id === match.winnerId ? match.player2 : match.player1;
+    const opponent = isWinner ? loser : winner;
+    const myEloChange = match.player1Id === uid ? match.player1EloChange : match.player2EloChange;
+    
+    return { isWinner, opponent, myEloChange };
+  };
+
   return (
     <Box>
       <Paper sx={{ p: 3, textAlign: "center", mb: 2 }}>
         <Avatar
-          src={player.photoURL}
+          src={player.photoURL || undefined}
           alt={player.displayName}
           sx={{ width: 80, height: 80, mx: "auto", mb: 1 }}
         />
@@ -124,7 +135,8 @@ export default function PlayerProfile() {
           </Typography>
           <List disablePadding>
             {playerMatches.slice(0, 10).map((match, index) => {
-              const isWinner = match.winnerId === uid;
+              const { isWinner, opponent, myEloChange } = getMatchInfo(match);
+              
               return (
                 <Box key={match.id}>
                   {index > 0 && <Divider />}
@@ -139,22 +151,16 @@ export default function PlayerProfile() {
                           )}
                           <Typography>
                             {isWinner ? "Beat" : "Lost to"}{" "}
-                            <strong>
-                              {isWinner ? match.loserName : match.winnerName}
-                            </strong>
+                            <strong>{opponent?.displayName || "Unknown"}</strong>
                           </Typography>
                           <Chip
-                            label={`${match.winnerScore}-${match.loserScore}`}
+                            label={match.score}
                             size="small"
                           />
                           <Chip
-                            label={
-                              isWinner
-                                ? `+${match.winnerEloChange}`
-                                : `${match.loserEloChange}`
-                            }
+                            label={myEloChange >= 0 ? `+${myEloChange}` : `${myEloChange}`}
                             size="small"
-                            color={isWinner ? "success" : "error"}
+                            color={myEloChange >= 0 ? "success" : "error"}
                             variant="outlined"
                           />
                         </Box>

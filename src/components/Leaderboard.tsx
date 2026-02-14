@@ -53,8 +53,8 @@ export default function Leaderboard() {
       <List disablePadding>
         {players.map((player, index) => (
           <ListItemButton
-            key={player.uid}
-            onClick={() => navigate(`/player/${player.uid}`)}
+            key={player.id}
+            onClick={() => navigate(`/player/${player.id}`)}
             sx={{
               mb: 1,
               borderRadius: 1,
@@ -79,7 +79,7 @@ export default function Leaderboard() {
               )}
             </Box>
             <ListItemAvatar>
-              <Avatar src={player.photoURL} alt={player.displayName} />
+              <Avatar src={player.photoURL || undefined} alt={player.displayName} />
             </ListItemAvatar>
             <ListItemText
               primary={player.displayName}

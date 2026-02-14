@@ -1,33 +1,7 @@
-export interface Player {
-  uid: string;
-  displayName: string;
-  email: string;
-  photoURL: string;
-  elo: number;
-  wins: number;
-  losses: number;
-  matchesPlayed: number;
-  createdAt: number;
-}
+// Re-export API types for backwards compatibility
+export type { ApiPlayer as Player, ApiMatch as Match, ApiFriendRequest as FriendRequest, ApiFriendship as Friendship } from '../api/client';
 
-export interface Match {
-  id: string;
-  winnerId: string;
-  winnerName: string;
-  winnerPhotoURL: string;
-  loserId: string;
-  loserName: string;
-  loserPhotoURL: string;
-  winnerScore: number;
-  loserScore: number;
-  scoreDetails?: string; // e.g., "6-4, 7-5" or "6-3, 4-6, 6-2"
-  playedAt?: number; // when the match was played
-  winnerEloChange: number;
-  loserEloChange: number;
-  createdAt: number;
-  recordedBy: string;
-}
-
+// Legacy types for components that haven't been updated yet
 export interface PendingMatch {
   id: string;
   winnerId: string;
@@ -39,32 +13,8 @@ export interface PendingMatch {
   winnerScore: number;
   loserScore: number;
   scoreDetails?: string;
-  playedAt: number; // when the match was played
-  createdAt: number; // when it was submitted
+  playedAt: number;
+  createdAt: number;
   recordedBy: string;
   status: "pending" | "approved" | "rejected";
-}
-
-export interface FriendRequest {
-  id: string;
-  fromUid: string;
-  fromName: string;
-  fromPhotoURL: string;
-  toUid: string;
-  toName: string;
-  toPhotoURL: string;
-  status: "pending" | "accepted" | "rejected";
-  createdAt: number;
-}
-
-export interface Friendship {
-  id: string;
-  users: [string, string]; // sorted UIDs for consistent querying
-  user1Uid: string;
-  user1Name: string;
-  user1PhotoURL: string;
-  user2Uid: string;
-  user2Name: string;
-  user2PhotoURL: string;
-  createdAt: number;
 }

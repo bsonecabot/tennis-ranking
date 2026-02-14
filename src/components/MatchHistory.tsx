@@ -11,22 +11,20 @@ import {
 } from "@mui/material";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import { useData } from "../contexts/DataContext";
-import type { Match, PendingMatch } from "../types";
+import { useAuth } from "../contexts/AuthContext";
+import type { ApiMatch } from "../api/client";
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString(undefined, {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 
-type HistoryItem = 
-  | { type: "confirmed"; data: Match }
-  | { type: "pending"; data: PendingMatch };
-
 export default function MatchHistory() {
-  const { matches, pendingMatches, loading } = useData();
+  const { matches, loading } = useData();
+  const { player: currentPlayer } = useAuth();
 
   if (loading) {
     return (
@@ -38,17 +36,12 @@ export default function MatchHistory() {
     );
   }
 
-  // Combine and sort by date (most recent first)
-  const allItems: HistoryItem[] = [
-    ...pendingMatches.map((p) => ({ type: "pending" as const, data: p })),
-    ...matches.map((m) => ({ type: "confirmed" as const, data: m })),
-  ].sort((a, b) => {
-    const dateA = a.data.playedAt || a.data.createdAt;
-    const dateB = b.data.playedAt || b.data.createdAt;
-    return dateB - dateA;
-  });
+  // Sort by date (most recent first)
+  const sortedMatches = [...matches].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
-  if (allItems.length === 0) {
+  if (sortedMatches.length === 0) {
     return (
       <Box textAlign="center" mt={4}>
         <Typography variant="h6" color="text.secondary">
@@ -58,15 +51,31 @@ export default function MatchHistory() {
     );
   }
 
+  const getMatchInfo = (match: ApiMatch) => {
+    const winner = match.winner || (match.winnerId === match.player1Id ? match.player1 : match.player2);
+    const loser = match.winnerId === match.player1Id ? match.player2 : match.player1;
+    const isMyMatch = match.player1Id === currentPlayer?.id || match.player2Id === currentPlayer?.id;
+    const iWon = match.winnerId === currentPlayer?.id;
+    
+    // Get ELO changes for winner/loser
+    const winnerEloChange = match.winnerId === match.player1Id ? match.player1EloChange : match.player2EloChange;
+    const loserEloChange = match.winnerId === match.player1Id ? match.player2EloChange : match.player1EloChange;
+    
+    return { winner, loser, isMyMatch, iWon, winnerEloChange, loserEloChange };
+  };
+
   return (
     <Box>
       <Typography variant="h5" fontWeight="bold" gutterBottom>
         Match History
       </Typography>
       <List disablePadding>
-        {allItems.map((item) => {
-          const isPending = item.type === "pending";
-          const match = item.data;
+        {sortedMatches.map((match) => {
+          const isPending = match.status === "pending";
+          const isRejected = match.status === "rejected";
+          const { winner, loser, winnerEloChange, loserEloChange } = getMatchInfo(match);
+
+          if (isRejected) return null;
 
           return (
             <ListItem
@@ -81,22 +90,22 @@ export default function MatchHistory() {
               }}
             >
               <ListItemAvatar>
-                <Avatar src={match.winnerPhotoURL} alt={match.winnerName} />
+                <Avatar src={winner?.photoURL || undefined} alt={winner?.displayName} />
               </ListItemAvatar>
               <ListItemText
                 primary={
                   <Box display="flex" alignItems="center" gap={1}>
                     <Typography fontWeight="bold">
-                      {match.winnerName}
+                      {winner?.displayName || "Unknown"}
                     </Typography>
                     <Typography color="text.secondary">vs</Typography>
-                    <Typography>{match.loserName}</Typography>
+                    <Typography>{loser?.displayName || "Unknown"}</Typography>
                   </Box>
                 }
                 secondary={
                   <Box display="flex" alignItems="center" gap={1} mt={0.5} flexWrap="wrap">
                     <Chip
-                      label={match.scoreDetails || `${match.winnerScore} - ${match.loserScore}`}
+                      label={match.score}
                       size="small"
                       color={isPending ? "default" : "primary"}
                     />
@@ -111,13 +120,13 @@ export default function MatchHistory() {
                     ) : (
                       <>
                         <Chip
-                          label={`+${(match as Match).winnerEloChange}`}
+                          label={`+${winnerEloChange}`}
                           size="small"
                           color="success"
                           variant="outlined"
                         />
                         <Chip
-                          label={`${(match as Match).loserEloChange}`}
+                          label={`${loserEloChange}`}
                           size="small"
                           color="error"
                           variant="outlined"
@@ -125,7 +134,7 @@ export default function MatchHistory() {
                       </>
                     )}
                     <Typography variant="caption" color="text.secondary">
-                      {formatDate(match.playedAt || match.createdAt)}
+                      {formatDate(match.createdAt)}
                     </Typography>
                   </Box>
                 }
